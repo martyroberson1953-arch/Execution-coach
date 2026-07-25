@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Execution Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   EXECUTION COACH — design tokens
+   The signature idea: the whole interface changes temperature
+   with your energy level. Low = cool + quiet. High = warm + loud.
+   Everything downstream reads from --accent, which the energy
+   dial rewrites at runtime.
+   ============================================================ */
+:root{
+  --ink:#0E1116;
+  --surface:#161A21;
+  --surface-2:#1D222B;
+  --surface-3:#242B36;
+  --line:#28303C;
+  --text:#E6E9EE;
+  --text-dim:#8C95A4;
+  --text-faint:#5C6675;
+
+  --energy-low:#5E9E96;
+  --energy-medium:#C9A227;
+  --energy-high:#C7466B;
+
+  --accent:var(--energy-medium);
+  --accent-soft:rgba(201,162,39,.14);
+
+  --display:"Instrument Serif", Georgia, serif;
+  --body:"Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --r:14px;
+  --pad:16px;
+  --tap:48px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ink);
+  color:var(--text);
+  font-family:var(--body);
+  font-size:16px;
+  line-height:1.5;
+  min-height:100vh;
+  padding-bottom:112px;
+  transition:background .35s ease;
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- ambient glow, tinted by energy ---------- */
+.glow{
+  position:fixed;top:-220px;left:50%;transform:translateX(-50%);
+  width:520px;height:420px;border-radius:50%;
+  background:var(--accent);opacity:.16;filter:blur(110px);
+  pointer-events:none;z-index:0;transition:background .35s ease,opacity .35s ease;
+}
+.wrap{position:relative;z-index:1;max-width:640px;margin:0 auto;padding:0 var(--pad)}
+
+/* ---------- header ---------- */
+header{padding:22px 0 4px}
+.brand{
+  font-family:var(--display);font-size:30px;line-height:1.1;letter-spacing:.2px;
+  display:flex;align-items:baseline;gap:10px;
+}
+.brand em{font-style:italic;color:var(--accent);transition:color .35s ease}
+.tagline{color:var(--text-faint);font-size:13px;margin-top:4px}
+
+/* ---------- project bar ---------- */
+.projectbar{display:flex;gap:8px;align-items:center;margin:18px 0 14px}
+select.project{
+  flex:1;appearance:none;background:var(--surface);color:var(--text);
+  border:1px solid var(--line);border-radius:12px;
+  padding:0 38px 0 14px;height:var(--tap);font-family:var(--body);font-size:15px;font-weight:500;
+  background-image:linear-gradient(45deg,transparent 50%,var(--text-dim) 50%),linear-gradient(135deg,var(--text-dim) 50%,transparent 50%);
+  background-position:calc(100% - 20px) 22px,calc(100% - 15px) 22px;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;
+}
+.iconbtn{
+  width:var(--tap);height:var(--tap);flex:0 0 auto;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  color:var(--text-dim);font-size:20px;cursor:pointer;font-family:var(--body);
+}
+.iconbtn:hover{color:var(--text);border-color:var(--surface-3)}
+
+/* ---------- energy dial (the signature element) ---------- */
+.dial{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:14px}
+.dial-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:11px}
+.dial-label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);font-weight:600}
+.dial-state{font-family:var(--display);font-style:italic;font-size:20px;color:var(--accent);transition:color .35s ease}
+.dial-track{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.dial-track button{
+  height:var(--tap);border-radius:10px;cursor:pointer;
+  background:var(--surface-2);border:1px solid transparent;
+  color:var(--text-dim);font-family:var(--body);font-size:14px;font-weight:600;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  transition:background .2s,color .2s,border-color .2s;
+}
+.dial-track button small{font-family:var(--mono);font-size:10px;opacity:.75;font-weight:400}
+.dial-track button[aria-pressed="true"]{color:var(--ink);font-weight:700}
+.dial-track button[data-e="low"][aria-pressed="true"]{background:var(--energy-low)}
+.dial-track button[data-e="medium"][aria-pressed="true"]{background:var(--energy-medium)}
+.dial-track button[data-e="high"][aria-pressed="true"]{background:var(--energy-high)}
+.dial-note{margin-top:10px;font-size:13px;color:var(--text-dim);line-height:1.45}
+
+/* ---------- tabs ---------- */
+nav.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:16px}
+nav.tabs button{
+  height:42px;border:0;border-radius:9px;background:transparent;color:var(--text-dim);
+  font-family:var(--body);font-size:14px;font-weight:600;cursor:pointer;transition:background .2s,color .2s;
+}
+nav.tabs button[aria-selected="true"]{background:var(--surface-3);color:var(--text)}
+
+.panel{display:none}
+.panel.on{display:block}
+
+/* ---------- tasks ---------- */
+.sechead{display:flex;justify-content:space-between;align-items:baseline;margin:6px 0 10px}
+.sechead h2{font-family:var(--display);font-size:22px;font-weight:400;margin:0}
+.count{font-family:var(--mono);font-size:12px;color:var(--text-faint)}
+
+.task{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:14px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;
+  transition:opacity .25s,transform .25s,border-color .2s;
+}
+.task.muted{opacity:.42}
+.task.done{opacity:0;transform:translateY(-6px)}
+.task .body{flex:1;min-width:0}
+.task h3{margin:0 0 5px;font-size:15.5px;font-weight:600;line-height:1.35}
+.task p{margin:0;font-size:13.5px;color:var(--text-dim);line-height:1.45}
+.meta{display:flex;align-items:center;gap:9px;margin-top:9px;font-family:var(--mono);font-size:11px;color:var(--text-faint)}
+.dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+.dot.low{background:var(--energy-low)}.dot.medium{background:var(--energy-medium)}.dot.high{background:var(--energy-high)}
+.done-btn{
+  width:40px;height:40px;flex:0 0 auto;border-radius:10px;cursor:pointer;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--text-faint);font-size:17px;
+}
+.done-btn:hover{background:var(--accent);border-color:var(--accent);color:var(--ink)}
+
+.empty{
+  border:1px dashed var(--line);border-radius:var(--r);padding:28px 20px;text-align:center;
+}
+.empty p{margin:0 0 4px;font-family:var(--display);font-size:20px}
+.empty span{font-size:13.5px;color:var(--text-dim)}
+
+.history{margin-top:26px}
+.history h4{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);margin:0 0 8px;font-weight:600}
+.hitem{font-size:13.5px;color:var(--text-faint);padding:7px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px}
+.hitem s{text-decoration-color:var(--text-faint);flex:1}
+.hitem time{font-family:var(--mono);font-size:11px;flex:0 0 auto}
+
+/* ---------- make (content generator) ---------- */
+.kinds{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:11px}
+.kinds button{
+  min-height:var(--tap);padding:8px 6px;border-radius:11px;cursor:pointer;
+  background:var(--surface);border:1px solid var(--line);color:var(--text-dim);
+  font-family:var(--body);font-size:13px;font-weight:600;line-height:1.25;transition:.2s;
+}
+.kinds button[aria-pressed="true"]{border-color:var(--accent);color:var(--text);background:var(--accent-soft)}
+.field{
+  width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  color:var(--text);font-family:var(--body);font-size:15px;padding:14px;min-height:var(--tap);
+}
+.field:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.primary{
+  width:100%;min-height:var(--tap);margin-top:10px;border:0;border-radius:12px;cursor:pointer;
+  background:var(--accent);color:var(--ink);font-family:var(--body);font-size:15px;font-weight:700;
+  transition:background .35s ease,opacity .2s;
+}
+.primary:disabled{opacity:.5;cursor:default}
+.output{
+  margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:14px;white-space:pre-wrap;font-size:14px;line-height:1.6;
+}
+.output header{display:flex;justify-content:space-between;align-items:center;padding:0 0 10px;margin-bottom:10px;border-bottom:1px solid var(--line)}
+.output header span{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);font-weight:600}
+.copy{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;color:var(--text-dim);font-family:var(--body);font-size:12px;font-weight:600;height:34px;padding:0 12px;cursor:pointer}
+.copy:hover{color:var(--text)}
+
+/* ---------- film: sits directly under the script ---------- */
+.film{margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.film-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:11px}
+.film-head span{font-size:12.5px;color:var(--text-dim);flex:1;min-width:0}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:10px;color:var(--text-dim);
+  font-family:var(--body);font-size:12px;font-weight:600;height:36px;padding:0 12px;cursor:pointer;flex:0 0 auto}
+.ghost:hover{color:var(--text);border-color:var(--surface-3)}
+.settings{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;display:none}
+.settings.on{display:block}
+.settings label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);font-weight:600;margin-bottom:6px}
+.settings .field{font-family:var(--mono);font-size:12.5px;min-height:44px}
+.settings small{display:block;margin-top:8px;font-size:12px;color:var(--text-faint);line-height:1.5}
+#player{width:100%;aspect-ratio:9/16;max-height:62vh;border-radius:11px;background:#000;margin-bottom:10px}
+#player:not([hidden]){display:block}
+.chapters{display:flex;gap:6px;margin-bottom:11px}
+.chapters button{
+  flex:1;height:34px;border-radius:8px;cursor:pointer;border:1px solid var(--line);
+  background:var(--surface-2);color:var(--text-faint);font-family:var(--mono);font-size:10.5px;
+}
+.chapters button.ready{color:var(--text-dim)}
+.chapters button.playing{background:var(--accent);border-color:var(--accent);color:var(--ink);font-weight:500}
+.bar{height:4px;border-radius:2px;background:var(--surface-3);overflow:hidden;margin-bottom:11px}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .8s linear}
+.film-actions{display:flex;gap:7px;flex-wrap:wrap}
+.film-actions button,.film-actions a{
+  flex:1;min-width:120px;min-height:42px;border-radius:10px;cursor:pointer;border:1px solid var(--line);
+  background:var(--surface-2);color:var(--text-dim);font-family:var(--body);font-size:13px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;text-decoration:none;
+}
+.film-actions button.go{background:var(--accent);border-color:var(--accent);color:var(--ink);transition:background .35s}
+.film-actions button:disabled{opacity:.5;cursor:default}
+details.prompts{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+details.prompts summary{cursor:pointer;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--text-faint);font-weight:600;list-style:none}
+details.prompts summary::-webkit-details-marker{display:none}
+details.prompts summary::after{content:' +';font-family:var(--mono)}
+details.prompts[open] summary::after{content:' −'}
+.shot{padding:11px 0;border-bottom:1px solid var(--line)}
+.shot:last-child{border-bottom:0}
+.shot b{font-size:12.5px;display:block;margin-bottom:4px}
+.shot p{margin:0 0 8px;font-size:12.5px;color:var(--text-dim);line-height:1.5}
+.shot .copy{width:100%}
+
+/* ---------- coach ---------- */
+.thread{display:flex;flex-direction:column;gap:10px}
+.msg{max-width:88%;padding:11px 14px;border-radius:var(--r);font-size:14.5px;line-height:1.5;white-space:pre-wrap}
+.msg.you{align-self:flex-end;background:var(--accent-soft);border:1px solid var(--accent);transition:.35s}
+.msg.coach{align-self:flex-start;background:var(--surface);border:1px solid var(--line)}
+
+/* ---------- composer ---------- */
+.composer{
+  position:fixed;left:0;right:0;bottom:0;z-index:5;
+  background:linear-gradient(to top,var(--ink) 62%,transparent);
+  padding:14px var(--pad) calc(14px + env(safe-area-inset-bottom));
+}
+.composer .inner{max-width:640px;margin:0 auto;display:flex;gap:8px;align-items:flex-end}
+.composer textarea{
+  flex:1;resize:none;max-height:120px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:14px;color:var(--text);font-family:var(--body);font-size:15px;padding:13px 14px;min-height:var(--tap);
+}
+.composer textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.mic,.send{width:var(--tap);height:var(--tap);flex:0 0 auto;border-radius:14px;cursor:pointer;border:1px solid var(--line);font-size:19px}
+.mic{background:var(--surface-2);color:var(--text-dim)}
+.mic.listening{background:var(--energy-high);color:var(--ink);border-color:var(--energy-high);animation:pulse 1.3s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.send{background:var(--accent);color:var(--ink);border-color:var(--accent);font-weight:700;transition:background .35s}
+
+/* ---------- status + toast + modal ---------- */
+.status{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--text-faint);margin-top:14px;padding-bottom:6px}
+.status .dot{width:6px;height:6px;background:var(--text-faint)}
+.status .dot.live{background:var(--energy-low)}
+.toast{
+  position:fixed;bottom:110px;left:50%;transform:translateX(-50%) translateY(10px);
+  background:var(--surface-3);border:1px solid var(--line);border-radius:11px;
+  padding:10px 16px;font-size:13.5px;opacity:0;pointer-events:none;transition:.25s;z-index:10;
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.scrim{position:fixed;inset:0;background:rgba(5,7,10,.72);display:none;align-items:center;justify-content:center;padding:20px;z-index:20}
+.scrim.on{display:flex}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;max-width:420px;width:100%}
+.modal h3{font-family:var(--display);font-size:24px;font-weight:400;margin:0 0 10px}
+.modal ol{margin:0 0 18px;padding-left:20px;font-size:14.5px;color:var(--text-dim);line-height:1.75}
+.modal ol b{color:var(--text);font-weight:600}
+</style>
+</head>
+<body>
+<div class="glow" id="glow"></div>
+
+<div class="wrap">
+  <header>
+    <div class="brand">Execution <em id="brandWord">Coach</em></div>
+    <div class="tagline">One small thing, sized to the energy you actually have. <span style="opacity:.5">· build 0724-2</span></div>
+  </header>
+
+  <div class="projectbar">
+    <select class="project" id="projectSel" aria-label="Active project"></select>
+    <button class="iconbtn" id="addProject" title="New project" aria-label="New project">+</button>
+    <button class="iconbtn" id="help" title="Quick start" aria-label="Quick start">?</button>
+  </div>
+
+  <!-- SIGNATURE: the energy dial retints the entire interface -->
+  <section class="dial">
+    <div class="dial-head">
+      <span class="dial-label">Energy right now</span>
+      <span class="dial-state" id="dialState">Medium</span>
+    </div>
+    <div class="dial-track" id="dialTrack" role="group" aria-label="Energy level">
+      <button data-e="low" aria-pressed="false">Low<small>≤15 min</small></button>
+      <button data-e="medium" aria-pressed="true">Medium<small>≤30 min</small></button>
+      <button data-e="high" aria-pressed="false">High<small>60 min+</small></button>
+    </div>
+    <p class="dial-note" id="dialNote"></p>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="today" aria-selected="true">Today</button>
+    <button role="tab" data-tab="make" aria-selected="false">Make</button>
+    <button role="tab" data-tab="coach" aria-selected="false">Coach</button>
+  </nav>
+
+  <!-- ============ TODAY ============ -->
+  <section class="panel on" id="panel-today">
+    <div class="sechead"><h2>Today</h2><span class="count" id="taskCount"></span></div>
+    <div id="taskList"></div>
+    <div class="history" id="historyWrap" hidden>
+      <h4>Done</h4>
+      <div id="historyList"></div>
+    </div>
+  </section>
+
+  <!-- ============ MAKE ============ -->
+  <section class="panel" id="panel-make">
+    <div class="sechead"><h2>Make something</h2></div>
+    <div class="kinds" id="kinds">
+      <button data-k="video" aria-pressed="true">Video script</button>
+      <button data-k="reddit" aria-pressed="false">Reddit reply</button>
+      <button data-k="plan" aria-pressed="false">Daily plan</button>
+    </div>
+    <input class="field" id="topic" placeholder="Topic — e.g. medical bill, insurance paperwork" autocomplete="off">
+    <button class="primary" id="genBtn">Generate</button>
+    <div id="outputWrap"></div>
+
+    <!-- The video lands here, directly beneath the script it came from. -->
+    <div class="film" id="film" hidden>
+      <div class="film-head">
+        <span id="filmState">Storyboarding…</span>
+        <button class="ghost" id="toggleSettings">Kling setup</button>
+      </div>
+
+      <div class="settings" id="settings">
+        <label for="klingUrl">Kling relay endpoint</label>
+        <input class="field" id="klingUrl" placeholder="https://your-app.vercel.app/api/kling" autocomplete="off" spellcheck="false">
+        <small>Your keys live on that server, never in this page. Without it the shots are still written and the payloads are still yours to copy.</small>
+      </div>
+
+      <div class="bar" id="filmBar" hidden><i></i></div>
+      <video id="player" playsinline muted controls hidden></video>
+      <div class="chapters" id="chapters"></div>
+      <div class="film-actions" id="filmActions"></div>
+
+      <details class="prompts" id="promptsBox" hidden>
+        <summary>Shot prompts</summary>
+        <div id="shotList"></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ COACH ============ -->
+  <section class="panel" id="panel-coach">
+    <div class="sechead"><h2>Coach</h2></div>
+    <div class="thread" id="thread"></div>
+  </section>
+
+  <div class="status"><span class="dot" id="engineDot"></span><span id="engineLabel">checking engine…</span></div>
+</div>
+
+<div class="composer">
+  <div class="inner">
+    <textarea id="input" rows="1" placeholder="Say a goal, or ask for anything…"></textarea>
+    <button class="mic" id="mic" title="Speak" aria-label="Speak">🎙</button>
+    <button class="send" id="send" title="Send" aria-label="Send">↑</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="scrim" id="scrim">
+  <div class="modal">
+    <h3>Quick start</h3>
+    <ol>
+      <li>Set your <b>energy</b>. Low means nothing over fifteen minutes gets suggested.</li>
+      <li>Type or speak a goal in the box at the bottom. You get back small, concrete tasks.</li>
+      <li>Tap the check to clear one. That's the whole loop.</li>
+      <li><b>Make</b> writes scripts and replies. <b>Coach</b> keeps the conversation.</li>
+    </ol>
+    <button class="primary" id="closeHelp">Start</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   1. STORAGE
+   Works two ways on purpose:
+   - Inside Claude, window.storage persists across sessions.
+   - Saved to your desktop as a file, it falls back to localStorage.
+   Swap this one object out for a real backend later; nothing
+   else in the app touches storage directly.
+   ============================================================ */
+const Store = {
+  async get(key){
+    if (window.storage){
+      try { const r = await window.storage.get(key, false); return r ? JSON.parse(r.value) : null; }
+      catch(e){ /* key missing throws — fall through */ }
+    }
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch(e){ return null; }
+  },
+  async set(key, val){
+    if (window.storage){
+      try { await window.storage.set(key, JSON.stringify(val), false); return; } catch(e){}
+    }
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){}
+  }
+};
+
+/* ============================================================
+   2. STATE
+   ============================================================ */
+const KEY = 'execution-coach:v1';
+let S = {
+  energy: 'medium',
+  activeId: null,
+  seenHelp: false,
+  projects: [],            // {id,name,tasks:[],done:[],thread:[]}
+};
+const uid = () => Math.random().toString(36).slice(2,9);
+const project = () => S.projects.find(p => p.id === S.activeId) || S.projects[0];
+const save = () => Store.set(KEY, S);
+
+const ENERGY_RULES = {
+  low:    { max:15, count:3, note:'Low energy. Only short, low-thinking tasks — nothing over about fifteen minutes.' },
+  medium: { max:30, count:4, note:'Medium energy. Normal-sized tasks, up to about half an hour each.' },
+  high:   { max:75, count:6, note:'High energy. Longer, heavier work is on the table — use it while it lasts.' }
+};
+
+/* ============================================================
+   3. GENERATION
+   Two engines behind one interface. askClaude() is live when the
+   app runs inside Claude. Everything falls back to the local
+   templates so the file still works offline on your desktop.
+   To point this at your own server later, change the URL and
+   headers in askClaude() — nothing else needs to change.
+   ============================================================ */
+let ENGINE = 'template';
+
+async function askClaude(prompt, system){
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      model:'claude-sonnet-4-6',
+      max_tokens:1000,
+      system: system || undefined,
+      messages:[{role:'user', content: prompt}]
+    })
+  });
+  if(!res.ok) throw new Error('engine unavailable');
+  const data = await res.json();
+  return data.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+}
+
+function parseJSON(text){
+  const clean = text.replace(/```json|```/g,'').trim();
+  const start = clean.indexOf('['), startO = clean.indexOf('{');
+  const cut = (start > -1 && (startO === -1 || start < startO)) ? start : startO;
+  return JSON.parse(cut > 0 ? clean.slice(cut) : clean);
+}
+
+/* ---- goal → tasks ---- */
+async function breakDownGoal(goal){
+  const r = ENERGY_RULES[S.energy];
+  try {
+    const raw = await askClaude(
+      `Goal: ${goal}\n\nThe person's energy is ${S.energy.toUpperCase()}. Return exactly ${r.count} tasks, none longer than ${r.max} minutes.`,
+      `You break vague goals into tiny, concrete, physical next actions for someone who is good at ideas and bad at follow-through.
+Rules: every task starts with a verb and names a specific artifact or decision. No task is abstract. No task is "research" without saying what and where. Estimated minutes must be realistic and under the stated cap.
+Return ONLY a JSON array, no prose, no markdown fences:
+[{"title":"...","description":"one plain sentence on what done looks like","minutes":10}]`
+    );
+    const arr = parseJSON(raw);
+    return arr.slice(0, r.count).map(t => ({
+      id: uid(), title: String(t.title).slice(0,120),
+      description: String(t.description || '').slice(0,200),
+      minutes: Math.min(Number(t.minutes) || 10, r.max),
+      energy: S.energy
+    }));
+  } catch(e){
+    return templateTasks(goal);
+  }
+}
+
+/* Local fallback — the five-step shape from the spec. */
+function templateTasks(goal){
+  const g = goal.replace(/^(break down|help me|i want to|how do i)\s*/i,'').trim();
+  const all = [
+    { title:`Clarify success criteria for: ${g}`, description:'Write one sentence describing what "done" looks like.', minutes:8 },
+    { title:'Identify the single next physical action', description:'Name the one thing you could open or click right now.', minutes:5 },
+    { title:'Gather required materials or examples', description:'Collect three references you can copy the shape of.', minutes:15 },
+    { title:'Create the first concrete piece', description:'Make one rough version. Rough is the point.', minutes:30 },
+    { title:'Review and set the next batch', description:'Look at what you made and write the next three actions.', minutes:20 },
+    { title:'Ship it somewhere public', description:'Post, send, or publish the piece you made.', minutes:25 }
+  ];
+  const r = ENERGY_RULES[S.energy];
+  return all.filter(t => t.minutes <= r.max).slice(0, r.count)
+            .map(t => ({...t, id: uid(), energy: S.energy}));
+}
+
+/* ---- content generator ---- */
+const STYLE = {
+  video:`HOOK (0-3 sec): Stop scrolling — this paperwork just cost someone real money.
+BODY: Most people freeze when they see complicated documents. DocExplain reads the document and tells you exactly what it means in plain English in under 60 seconds.
+DEMO: Show uploading a page → clear explanation appears.
+CTA: Try one free page at [your link]. Link in bio / comments.`,
+  reddit:`I dealt with the exact same confusion.
+What finally helped was breaking it into three questions:
+1. What is this document actually for?
+2. What are the key deadlines or obligations?
+3. What happens if I do nothing?
+
+There's a simple AI tool called DocExplain that does this in seconds if you want to try it. Happy to share more if it's useful.`
+};
+
+async function generate(kind, topic){
+  const t = topic || 'a confusing document';
+  try {
+    if (kind === 'plan') {
+      const tasks = project().tasks;
+      const raw = await askClaude(
+        `Energy: ${S.energy}. Project: ${project().name}. Topic or focus: ${t}.\nPending tasks:\n${tasks.map(x=>'- '+x.title).join('\n') || '- none yet'}`,
+        `Write a short daily plan: three lines maximum, each a concrete action with a time estimate, ordered so the easiest one is first. Plain text only. Practical and direct, never hypey.`
+      );
+      return raw;
+    }
+    const raw = await askClaude(
+      `Topic: ${t}\n\nWrite one in exactly this format and voice:\n\n${STYLE[kind]}`,
+      `You write short-form marketing for DocExplain, an AI document explainer. Match the given format exactly, label for label. Practical, direct, non-hypey. Never exaggerate. Plain text only, no markdown.`
+    );
+    return raw;
+  } catch(e){
+    return templateContent(kind, t);
+  }
+}
+
+function templateContent(kind, t){
+  if (kind === 'video') return `HOOK (0-3 sec): Stop scrolling — that ${t} just cost someone real money.
+BODY: Most people freeze when they see a ${t}. DocExplain reads it and tells you exactly what it means in plain English in under 60 seconds.
+DEMO: Show uploading a ${t} → clear explanation appears.
+CTA: Try one free page at [your link]. Link in bio / comments.`;
+  if (kind === 'reddit') return `I dealt with the exact same confusion over a ${t}.
+What finally helped was breaking it into three questions:
+1. What is this document actually for?
+2. What are the key deadlines or obligations?
+3. What happens if I do nothing?
+
+There's a simple AI tool called DocExplain that does this in seconds if you want to try it. Happy to share more if it's useful.`;
+  const r = ENERGY_RULES[S.energy];
+  return `Plan for today — ${S.energy} energy, ${r.max} min ceiling.
+1. ${project().tasks[0]?.title || 'Pick one goal and break it down'} (${project().tasks[0]?.minutes || 10} min)
+2. Make one piece of content about ${t} (15 min)
+3. Post it and stop for the day (10 min)`;
+}
+
+/* ============================================================
+   3b. KLING VIDEO ENGINE
+   Three stages, deliberately separate:
+     shots()  — Claude turns a finished script into camera-ready
+                Kling prompts. Runs anywhere this app runs.
+     create() — hands one shot to your relay, gets a task id back.
+     poll()   — asks the relay whether that task finished yet.
+
+   create/poll go through YOUR relay, not straight to Kling.
+   Kling signs every request with a JWT built from an access key
+   and a secret key, and a secret key in a web page is a secret
+   key you have given away. The relay holds them. See api/kling.js.
+   ============================================================ */
+const Kling = {
+  endpoint: '',
+
+  /* Script → shot prompts. Kling reads camera language, not ad copy. */
+  async shots(script, topic){
+    try {
+      const raw = await askClaude(
+        `Topic: ${topic || 'a confusing document'}\n\nScript:\n${script}`,
+        `You turn a short-form video script into prompts for Kling, a text-to-video model.
+Write 3 shots that visually carry the script. Rules:
+- Each prompt is one dense paragraph of camera language: subject, action, camera move, lens, lighting, mood. No dialogue, no narration, no brand names.
+- Never ask for on-screen text, captions, logos, or user interfaces with readable words — the model renders text as garbage. Show hands, paper, faces, desks, screens shot at an angle instead.
+- Vertical framing. Real, grounded, documentary-feeling. Not glossy stock footage.
+- 5 seconds each.
+Return ONLY a JSON array, no prose, no fences:
+[{"label":"Hook","prompt":"...","negative_prompt":"text, captions, watermark, logo, distorted hands, blurry"}]`
+      );
+      return parseJSON(raw).slice(0,3).map((s,i) => ({
+        id: uid(),
+        label: s.label || `Shot ${i+1}`,
+        prompt: String(s.prompt),
+        negative_prompt: s.negative_prompt || 'text, captions, watermark, logo, distorted hands, blurry, low quality',
+        duration: '5',
+        status: 'ready',
+        url: null
+      }));
+    } catch(e){
+      return this.templateShots(topic);   // no live engine here — write usable prompts by hand instead
+    }
+  },
+
+  /* Local fallback — three generic but genuinely usable shots, same rules as above. */
+  templateShots(topic){
+    const t = topic || 'a confusing document';
+    const NEG = 'text, captions, watermark, logo, distorted hands, blurry, low quality';
+    return [
+      { id: uid(), label: 'Hook', duration: '5', status: 'ready', url: null, negative_prompt: NEG,
+        prompt: `Vertical shot, close on a person's hands setting down ${t} on a kitchen counter at morning light, shallow depth of field, slight handheld sway, documentary realism, worried but composed expression at the edge of frame, soft window light from the left, 35mm lens feel.` },
+      { id: uid(), label: 'Demo', duration: '5', status: 'ready', url: null, negative_prompt: NEG,
+        prompt: `Vertical shot, overhead angle looking down at hands holding a phone above ${t} spread on a desk, slow steady push-in, clean natural light, calm focused mood, fingers tracing a line of text, shallow focus racking from paper to phone screen.` },
+      { id: uid(), label: 'CTA', duration: '5', status: 'ready', url: null, negative_prompt: NEG,
+        prompt: `Vertical shot, medium close-up of a person setting down ${t} and leaning back with visible relief, soft exhale, warm late-afternoon light through a window behind them, gentle handheld stability, documentary realism, genuine unscripted expression.` }
+    ];
+  },
+
+  /* The exact body Kling expects. Shown to you verbatim when no relay is set. */
+  payload(shot){
+    return {
+      model_name: 'kling-v2-6',
+      prompt: shot.prompt,
+      negative_prompt: shot.negative_prompt,
+      duration: shot.duration,
+      aspect_ratio: '9:16',
+      mode: 'professional',
+      cfg_scale: 0.5
+    };
+  },
+
+  async create(shot){
+    const r = await fetch(this.endpoint, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'create', ...this.payload(shot) })
+    });
+    if(!r.ok) throw new Error(`relay said ${r.status}`);
+    const d = await r.json();
+    const id = d.task_id || d.data?.task_id;
+    if(!id) throw new Error('relay returned no task id');
+    return id;
+  },
+
+  async poll(taskId){
+    const r = await fetch(this.endpoint, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'status', task_id: taskId })
+    });
+    if(!r.ok) throw new Error(`relay said ${r.status}`);
+    const d = await r.json();
+    const data = d.data || d;
+    return { status: data.task_status || data.status, url: data.task_result?.videos?.[0]?.url || data.url || null };
+  },
+
+  /* All shots at once. Kling queues them in parallel, so three clips take
+     about as long as one — roughly one to four minutes, not nine to twelve.
+     onUpdate fires after every poll so the screen can fill in as clips land. */
+  async renderAll(list, onUpdate){
+    await Promise.all(list.map(async s => {
+      try { s.taskId = await this.create(s); s.status = 'rendering'; }
+      catch(e){ s.status = 'failed'; s.error = e.message; }
+    }));
+    onUpdate();
+
+    const started = Date.now(), limit = 8 * 60 * 1000;
+    while (list.some(s => s.status === 'rendering') && Date.now() - started < limit){
+      await new Promise(r => setTimeout(r, 8000));
+      await Promise.all(list.filter(s => s.status === 'rendering').map(async s => {
+        try {
+          const { status, url } = await this.poll(s.taskId);
+          if (status === 'succeed' && url){ s.url = url; s.status = 'ready'; }
+          else if (status === 'failed'){ s.status = 'failed'; s.error = 'Kling could not render this shot'; }
+        } catch(e){ /* one bad poll is not a failure — try again next tick */ }
+      }));
+      onUpdate(Math.min(0.95, (Date.now() - started) / (150 * 1000)));
+    }
+    list.filter(s => s.status === 'rendering').forEach(s => { s.status = 'failed'; s.error = 'timed out'; });
+    onUpdate(1);
+  },
+
+  /* Submit, then check every 8 seconds for up to 6 minutes.
+     Kling is a job queue, not a request — a 5s clip takes 1–4 minutes. */
+  async render(shot, onTick){
+    const taskId = await this.create(shot);
+    const started = Date.now(), limit = 6 * 60 * 1000;
+    while (Date.now() - started < limit){
+      await new Promise(r => setTimeout(r, 8000));
+      const { status, url } = await this.poll(taskId);
+      onTick(Math.min(0.95, (Date.now() - started) / (150 * 1000)));
+      if (status === 'succeed' && url) return url;
+      if (status === 'failed') throw new Error('Kling could not render that shot');
+    }
+    throw new Error('still rendering after six minutes — check your Kling dashboard');
+  }
+};
+
+/* ============================================================
+   4. RENDER
+   ============================================================ */
+const $ = id => document.getElementById(id);
+
+function applyEnergy(){
+  const map = { low:'--energy-low', medium:'--energy-medium', high:'--energy-high' };
+  const soft = { low:'rgba(94,158,150,.14)', medium:'rgba(201,162,39,.14)', high:'rgba(199,70,107,.14)' };
+  const css = getComputedStyle(document.documentElement).getPropertyValue(map[S.energy]).trim();
+  document.documentElement.style.setProperty('--accent', css);
+  document.documentElement.style.setProperty('--accent-soft', soft[S.energy]);
+  $('dialState').textContent = S.energy[0].toUpperCase() + S.energy.slice(1);
+  $('dialNote').textContent = ENERGY_RULES[S.energy].note;
+  [...$('dialTrack').children].forEach(b => b.setAttribute('aria-pressed', b.dataset.e === S.energy));
+}
+
+function renderProjects(){
+  const sel = $('projectSel');
+  sel.innerHTML = S.projects.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  sel.value = S.activeId;
+}
+
+function renderTasks(){
+  const p = project(); if(!p) return;
+  const cap = ENERGY_RULES[S.energy].max;
+  const list = $('taskList');
+  if (!p.tasks.length){
+    list.innerHTML = `<div class="empty"><p>Nothing queued.</p><span>Type a goal below and it becomes small tasks.</span></div>`;
+  } else {
+    list.innerHTML = p.tasks.map(t => `
+      <article class="task ${t.minutes > cap ? 'muted' : ''}" data-id="${t.id}">
+        <div class="body">
+          <h3>${esc(t.title)}</h3>
+          ${t.description ? `<p>${esc(t.description)}</p>` : ''}
+          <div class="meta"><span class="dot ${t.energy}"></span>${t.energy} · ${t.minutes} min${t.minutes > cap ? ' · above your energy' : ''}</div>
+        </div>
+        <button class="done-btn" data-done="${t.id}" aria-label="Mark done">✓</button>
+      </article>`).join('');
+  }
+  const fits = p.tasks.filter(t => t.minutes <= cap).length;
+  $('taskCount').textContent = p.tasks.length ? `${fits} of ${p.tasks.length} fit right now` : '';
+  $('historyWrap').hidden = !p.done.length;
+  $('historyList').innerHTML = p.done.slice(-12).reverse()
+    .map(d => `<div class="hitem"><s>${esc(d.title)}</s><time>${d.at}</time></div>`).join('');
+}
+
+function renderThread(){
+  const p = project(); if(!p) return;
+  $('thread').innerHTML = p.thread.slice(-10)
+    .map(m => `<div class="msg ${m.role}">${esc(m.text)}</div>`).join('')
+    || `<div class="empty"><p>Say what you're stuck on.</p><span>Goals become tasks. Everything else gets an answer.</span></div>`;
+  $('thread').scrollTop = $('thread').scrollHeight;
+}
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 1900);
+}
+
+/* ============================================================
+   5. EVENTS
+   ============================================================ */
+$('dialTrack').addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  S.energy = b.dataset.e; applyEnergy(); renderTasks(); save();
+});
+
+document.querySelectorAll('nav.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('nav.tabs button').forEach(x => x.setAttribute('aria-selected', x === b));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('on', p.id === 'panel-' + b.dataset.tab));
+}));
+
+$('projectSel').addEventListener('change', e => {
+  S.activeId = e.target.value; renderTasks(); renderThread(); save();
+});
+
+$('addProject').addEventListener('click', () => {
+  const name = prompt('Project name');
+  if(!name) return;
+  const p = { id: uid(), name: name.trim(), tasks:[], done:[], thread:[] };
+  S.projects.push(p); S.activeId = p.id;
+  renderProjects(); renderTasks(); renderThread(); save();
+});
+
+$('taskList').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-done]'); if(!btn) return;
+  const id = btn.dataset.done, p = project();
+  const i = p.tasks.findIndex(t => t.id === id); if(i < 0) return;
+  const [t] = p.tasks.splice(i, 1);
+  p.done.push({ title: t.title, at: new Date().toLocaleDateString(undefined,{month:'short',day:'numeric'}) });
+  document.querySelector(`.task[data-id="${id}"]`)?.classList.add('done');
+  await save(); setTimeout(renderTasks, 220);
+});
+
+/* --- Make tab --- */
+let kind = 'video';
+$('kinds').addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  kind = b.dataset.k;
+  [...$('kinds').children].forEach(x => x.setAttribute('aria-pressed', x === b));
+});
+
+$('genBtn').addEventListener('click', async () => {
+  const btn = $('genBtn'); btn.disabled = true; btn.textContent = 'Writing…';
+  const text = await generate(kind, $('topic').value.trim());
+  $('outputWrap').innerHTML = `
+    <div class="output"><header><span>${kind === 'video' ? 'Video script' : kind === 'reddit' ? 'Reddit reply' : 'Daily plan'}</span>
+    <button class="copy" id="copyBtn">Copy</button></header>${esc(text)}</div>`;
+  $('copyBtn').addEventListener('click', () => {
+    navigator.clipboard.writeText(text).then(() => toast('Copied')).catch(() => toast('Select and copy manually'));
+  });
+  btn.disabled = false; btn.textContent = 'Generate';
+
+  // A video script rolls straight into pictures. No second button.
+  if (kind === 'video'){
+    $('film').hidden = false;
+    $('filmState').textContent = 'Starting…';
+    makeFilm(text, $('topic').value.trim()).catch(err => {
+      $('film').hidden = false;
+      $('filmState').textContent = 'Video builder hit an error: ' + err.message;
+    });
+  } else {
+    $('film').hidden = true;
+  }
+});
+
+/* ============================================================
+   THE FILM
+   Script → shot prompts → three clips submitted at once → one
+   player, directly under the script, playing them back to back
+   as they land. Nothing here waits on a click.
+   ============================================================ */
+let shots = [], playIdx = 0;
+
+$('toggleSettings').addEventListener('click', () => $('settings').classList.toggle('on'));
+$('klingUrl').addEventListener('change', e => {
+  Kling.endpoint = e.target.value.trim();
+  S.klingEndpoint = Kling.endpoint; save();
+  toast(Kling.endpoint ? 'Relay saved' : 'Relay cleared');
+});
+
+async function makeFilm(script, topic){
+  const film = $('film'), state = $('filmState'), bar = $('filmBar');
+  if (!film || !state){ toast('Video panel is missing from this page — reload and try again'); return; }
+
+  try {
+    shots = []; playIdx = 0;
+    film.hidden = false;
+    $('player').hidden = true; $('chapters').innerHTML = ''; $('filmActions').innerHTML = '';
+    $('promptsBox').hidden = true; bar.hidden = true;
+    state.textContent = 'Storyboarding the script…';
+
+    shots = await Kling.shots(script, topic);
+
+    renderPrompts(); $('promptsBox').hidden = false; paintChapters();
+
+    if (!Kling.endpoint){
+      state.textContent = 'Three shots written. Connect your Kling relay to see them play here.';
+      $('filmActions').innerHTML = `<button class="go" id="openSetup">Connect Kling</button>`;
+      $('openSetup').addEventListener('click', () => $('settings').classList.add('on'));
+      return;
+    }
+
+    state.textContent = 'Sending three shots to Kling…';
+    bar.hidden = false;
+
+    await Kling.renderAll(shots, pct => {
+      if (typeof pct === 'number') bar.querySelector('i').style.width = (pct * 100) + '%';
+      const done = shots.filter(s => s.url).length;
+      const dead = shots.filter(s => s.status === 'failed').length;
+      state.textContent = done === shots.length
+        ? 'All three shots are in.'
+        : `${done} of ${shots.length} shots ready${dead ? ` · ${dead} failed` : ''} — usually one to four minutes.`;
+      paintChapters();
+      if (done && $('player').hidden) startPlayback();   // start the moment shot one lands
+    });
+
+    bar.hidden = true;
+    if (!shots.some(s => s.url)) state.textContent = shots[0]?.error || 'Kling returned nothing. Check the relay logs.';
+    else buildActions();
+  } catch(err){
+    // Whatever broke, put it on the screen rather than swallowing it.
+    film.hidden = false;
+    state.textContent = 'Video builder hit an error: ' + err.message;
+  }
+}
+
+/* One player, three clips, played end to end. Skips anything not ready yet. */
+function startPlayback(){
+  const v = $('player');
+  v.hidden = false;
+  playIdx = shots.findIndex(s => s.url);
+  v.src = shots[playIdx].url;
+  v.play().catch(() => {});      // muted, so autoplay is allowed
+  paintChapters();
+  v.onended = () => {
+    let next = shots.findIndex((s, i) => i > playIdx && s.url);
+    if (next === -1) next = shots.findIndex(s => s.url);   // loop the reel
+    playIdx = next; v.src = shots[next].url; v.play().catch(() => {});
+    paintChapters();
+  };
+}
+
+function paintChapters(){
+  $('chapters').innerHTML = shots.map((s, i) => {
+    const cls = s.url ? (i === playIdx && !$('player').hidden ? 'playing' : 'ready') : '';
+    const mark = s.url ? '●' : s.status === 'failed' ? '×' : '○';
+    return `<button class="${cls}" data-jump="${i}" ${s.url ? '' : 'disabled'}>${mark} ${esc(s.label)}</button>`;
+  }).join('');
+}
+
+$('chapters').addEventListener('click', e => {
+  const b = e.target.closest('[data-jump]'); if(!b) return;
+  const i = +b.dataset.jump; if(!shots[i]?.url) return;
+  playIdx = i; const v = $('player');
+  v.hidden = false; v.src = shots[i].url; v.play().catch(() => {}); paintChapters();
+});
+
+function buildActions(){
+  $('filmActions').innerHTML = shots.filter(s => s.url).map((s, i) =>
+    `<a href="${s.url}" download="shot-${i+1}.mp4" target="_blank" rel="noopener">Save ${esc(s.label)}</a>`).join('');
+}
+
+function renderPrompts(){
+  $('shotList').innerHTML = shots.map(s => `
+    <div class="shot">
+      <b>${esc(s.label)} · ${s.duration}s · 9:16</b>
+      <p>${esc(s.prompt)}</p>
+      <button class="copy" data-payload="${s.id}">Copy Kling payload</button>
+    </div>`).join('');
+}
+
+$('shotList').addEventListener('click', e => {
+  const b = e.target.closest('[data-payload]'); if(!b) return;
+  const s = shots.find(x => x.id === b.dataset.payload);
+  navigator.clipboard.writeText(JSON.stringify(Kling.payload(s), null, 2))
+    .then(() => toast('Kling payload copied')).catch(() => toast('Copy failed'));
+});
+
+/* --- composer: routes a goal into tasks, anything else to the coach --- */
+const GOAL_HINT = /(break down|goal|plan|how do i|help me|i want to|get .* aware|grow|launch|build|write|reach)/i;
+
+async function submit(){
+  const box = $('input'); const text = box.value.trim(); if(!text) return;
+  box.value = ''; box.style.height = 'auto';
+  const p = project();
+  p.thread.push({ role:'you', text });
+  document.querySelector('nav.tabs button[data-tab="coach"]').click();
+  p.thread.push({ role:'coach', text:'Thinking…' }); renderThread();
+
+  let reply;
+  if (GOAL_HINT.test(text) || text.split(/\s+/).length > 7){
+    const tasks = await breakDownGoal(text);
+    p.tasks.push(...tasks);
+    reply = `Added ${tasks.length} task${tasks.length>1?'s':''} to ${p.name}, sized for ${S.energy} energy:\n\n` +
+            tasks.map(t => `• ${t.title} (${t.minutes} min)`).join('\n') + `\n\nStart with the first one.`;
+    renderTasks();
+  } else {
+    try {
+      reply = await askClaude(text, `You are a blunt, warm execution coach. Two or three sentences maximum. Give the next physical action, never a pep talk. The person's energy today is ${S.energy}.`);
+    } catch(e){
+      reply = `Engine is offline, so here's the plain version: name the smallest physical thing you could do about that in the next ten minutes, and do only that.`;
+    }
+  }
+  p.thread[p.thread.length - 1] = { role:'coach', text: reply };
+  renderThread(); save();
+}
+
+$('send').addEventListener('click', submit);
+$('input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); submit(); }
+});
+$('input').addEventListener('input', e => {
+  e.target.style.height = 'auto';
+  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+});
+
+/* --- voice input --- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const mic = $('mic');
+if (SR){
+  const rec = new SR();
+  rec.continuous = false; rec.interimResults = true; rec.lang = 'en-US';
+  let live = false;
+  mic.addEventListener('click', () => { live ? rec.stop() : rec.start(); });
+  rec.onstart = () => { live = true; mic.classList.add('listening'); };
+  rec.onend   = () => { live = false; mic.classList.remove('listening'); };
+  rec.onerror = () => { live = false; mic.classList.remove('listening'); toast('Mic did not catch that'); };
+  rec.onresult = e => {
+    const said = [...e.results].map(r => r[0].transcript).join('');
+    $('input').value = said;
+    $('input').dispatchEvent(new Event('input'));
+  };
+} else {
+  mic.addEventListener('click', () => toast('This browser has no speech input — try Chrome or Safari'));
+  mic.style.opacity = .45;
+}
+
+/* --- quick start --- */
+$('help').addEventListener('click', () => $('scrim').classList.add('on'));
+$('closeHelp').addEventListener('click', () => {
+  $('scrim').classList.remove('on'); S.seenHelp = true; save();
+});
+
+/* ============================================================
+   6. BOOT
+   ============================================================ */
+(async function init(){
+  const saved = await Store.get(KEY);
+  if (saved && saved.projects?.length) S = saved;
+  else {
+    S.projects = [
+      { id: uid(), name:'DocExplain Growth', tasks:[], done:[], thread:[] },
+      { id: uid(), name:'CMMC Sentinel',     tasks:[], done:[], thread:[] }
+    ];
+    S.activeId = S.projects[0].id;
+  }
+  if (!project()) S.activeId = S.projects[0].id;
+
+  Kling.endpoint = S.klingEndpoint || '';
+  $('klingUrl').value = Kling.endpoint;
+
+  applyEnergy(); renderProjects(); renderTasks(); renderThread();
+  if (!S.seenHelp) $('scrim').classList.add('on');
+
+  // Probe the engine once so the footer tells the truth about which mode is live.
+  try {
+    await askClaude('Reply with the single word: ok');
+    ENGINE = 'claude';
+    $('engineDot').classList.add('live');
+    $('engineLabel').textContent = 'AI engine live — tasks and copy are written fresh';
+  } catch(e){
+    $('engineLabel').textContent = 'offline mode — using built-in templates';
+  }
+})();
+</script>
+</body>
+</html>
